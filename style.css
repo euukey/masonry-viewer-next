@@ -1,0 +1,1009 @@
+/* ============================================================================
+   组件样式：只引用令牌（open-props.min.css 的原子 + tokens.css 的语义层），
+   不出现魔法数字。层级顺序在 tokens.css 里声明：tokens < reset < components。
+   ============================================================================ */
+
+@layer components {
+  /* ---------- 基础 ---------- */
+  body {
+    margin: 0;
+    background-color: var(--bg);
+    color: var(--text-1);
+    display: flex;
+    overflow-y: scroll;
+    font-family: var(--font-sans);
+    font-size: var(--font-size-1);
+    line-height: var(--font-lineheight-3);
+    -webkit-font-smoothing: antialiased;
+    /* 顶部/底部跳转、跳文件夹这类程序化滚动走平滑，滚轮不受影响 */
+    scroll-behavior: smooth;
+    /* 刻意不给背景色加过渡：切主题时整屏逐帧重绘会让毛玻璃面板反复重算模糊，图多就卡 */
+  }
+  @media (prefers-reduced-motion: reduce) {
+    body {
+      scroll-behavior: auto;
+    }
+  }
+  /* 切换主题的那一两帧里禁用所有过渡，让主题「一帧换掉」 */
+  :root.theming *,
+  :root.theming *::before,
+  :root.theming *::after {
+    transition: none !important;
+  }
+  #hint {
+    position: fixed;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    padding: var(--size-px-6);
+    color: var(--text-2);
+    outline: 1px dashed var(--stroke-1);
+    outline-offset: calc(-1 * var(--size-px-5));
+    border-radius: var(--radius-card);
+    cursor: pointer;
+    transition: color var(--dur-2) var(--ease-2),
+      outline-color var(--dur-2) var(--ease-2),
+      background-color var(--dur-2) var(--ease-2);
+  }
+  #hint:hover {
+    color: var(--text-1);
+    outline-color: var(--stroke-2);
+    background-color: color-mix(in oklab, var(--surface-1) 45%, transparent);
+  }
+  /* ---------- 首屏落地页（还没打开文件夹时） ---------- */
+  .home {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--size-px-2);
+    max-width: 520px;
+    text-align: center;
+  }
+  .home-logo {
+    width: 64px;
+    height: 64px;
+    border-radius: var(--radius-3);
+    box-shadow: var(--shadow-3);
+    user-select: none;
+  }
+  .home-title {
+    margin: 0;
+    font-size: var(--font-size-4);
+    font-weight: var(--font-weight-7);
+    color: var(--text-1);
+  }
+  .home-sub {
+    margin: 0;
+    font-size: var(--font-size-0);
+    color: var(--text-2);
+  }
+  .home-actions {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--size-px-2);
+    margin-top: var(--size-px-1);
+  }
+  .homebtn {
+    height: 38px;
+    padding: 0 var(--size-px-5);
+    font-size: var(--font-size-1);
+    font-weight: var(--font-weight-5);
+    border: 1px solid var(--stroke-1);
+    border-radius: var(--radius-round);
+    background-color: var(--surface-1);
+    color: var(--text-1);
+    cursor: pointer;
+    transition: background-color var(--dur-2) var(--ease-2),
+      border-color var(--dur-2) var(--ease-2), scale var(--dur-1) var(--ease-2);
+  }
+  .homebtn:hover {
+    background-color: var(--surface-hover);
+    border-color: var(--stroke-2);
+  }
+  .homebtn:active {
+    scale: 0.97;
+  }
+  .homebtn.primary {
+    background-color: var(--active-bg);
+    border-color: transparent;
+    color: var(--active-fg);
+  }
+  .homebtn[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  #hintnotice {
+    margin: 0;
+    padding: var(--size-px-2) var(--size-px-3);
+    border: 1px solid var(--stroke-1);
+    border-radius: var(--radius-chip);
+    background-color: var(--surface-1);
+    font-size: var(--font-size-0);
+    color: var(--text-2);
+  }
+  #cursorplace {
+    position: fixed;
+    height: 100%;
+    width: 1px;
+    z-index: var(--z-panel);
+  }
+  #indicator {
+    position: fixed;
+    top: 0;
+    right: var(--size-px-3);
+    box-sizing: border-box;
+    width: 46px;
+    height: 46px;
+    place-items: center;
+    pointer-events: none;
+    border: 1px solid var(--stroke-1);
+    background-color: var(--panel-bg);
+    backdrop-filter: var(--blur-card);
+    border-radius: var(--radius-round);
+    box-shadow: var(--shadow-3);
+    font-size: var(--font-size-0);
+    font-variant-numeric: tabular-nums;
+    animation: scrollmove linear;
+    animation-timeline: scroll();
+    display: none;
+  }
+  #indicator.show {
+    display: grid;
+  }
+
+  /* ---------- 瀑布流网格 ---------- */
+  #imgbox {
+    flex: 1;
+    display: flex;
+    flex-wrap: wrap;
+    line-height: 0;
+    column-gap: var(--colgap);
+  }
+  .colflex {
+    align-items: flex-start;
+  }
+  .rowflex {
+    row-gap: var(--rowgap);
+  }
+  .rowflex::after {
+    content: "";
+    flex-grow: 114514;
+  }
+  .imgcol {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    row-gap: var(--rowgap);
+  }
+  .wrap {
+    position: relative;
+    cursor: pointer;
+  }
+  .wrap > img {
+    width: 100%;
+    height: auto;
+    border: solid var(--img-stroke);
+    border-radius: var(--imgradius);
+    border-width: var(--imgborder);
+    /* 淡入短一点，快速滚动时填充更跟手 */
+    transition: opacity var(--dur-2) var(--ease-2);
+  }
+  /* 占位：宽高比已经定好，图片解码完再淡入，滚动时不会把版面顶来顶去 */
+  .wrap.pending {
+    background-color: var(--surface-1);
+    border-radius: max(0px, calc(var(--imgradius) - var(--imgborder)));
+  }
+  .wrap.pending > img {
+    opacity: 0;
+  }
+  img {
+    user-select: none;
+  }
+  #rep {
+    visibility: hidden;
+  }
+  .wrap:hover > .info {
+    visibility: visible;
+  }
+  /* 设置里关掉「悬停显示详情」后，连残留的详情条也一并隐藏 */
+  :root.nohoverinfo .info {
+    display: none;
+  }
+  .info {
+    position: absolute;
+    /* 内缩一个边框宽度，正好落在照片内容区里：
+       这样下沿圆角与图片内圆角完全重合，不会再漏出白边框的一丝弧 */
+    inset: auto var(--imgborder) var(--imgborder) var(--imgborder);
+    padding: var(--size-px-3) var(--size-px-4);
+    font-size: var(--font-size-0);
+    line-height: var(--font-lineheight-3);
+    text-align: left;
+    color: var(--text-1);
+    /* 不透明底：压在亮照片上也读得清（半透明会让文字发糊） */
+    background-color: var(--popover-bg);
+    /* 只有下沿需要跟图片内圆角对齐（左右与照片边缘齐平，上沿是条直边，
+       圆起来会像浮空胶囊，很怪） */
+    border-radius: 0 0
+      max(0px, calc(var(--imgradius) - var(--imgborder)))
+      max(0px, calc(var(--imgradius) - var(--imgborder)));
+    visibility: hidden;
+  }
+  /* 详情排版：一行「尺寸 · 体积 · 时间」，一行文件名（更大更粗），必要时再加一行目录；
+     每行都单行省略，不会把图片糊住一大片 */
+  .info > div {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    cursor: text;
+  }
+  .info-meta {
+    font-size: var(--font-size-0);
+    color: color-mix(in oklab, var(--text-1) 86%, transparent);
+    font-variant-numeric: tabular-nums;
+  }
+  .info-name {
+    font-size: 0.875rem;
+    font-weight: var(--font-weight-6);
+  }
+  .info-dir {
+    font-size: var(--font-size-0);
+    color: color-mix(in oklab, var(--text-1) 68%, transparent);
+  }
+
+  /* ---------- 灯箱 ---------- */
+  #cover {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-panel);
+    outline: none;
+    background-color: var(--scrim);
+    display: none;
+  }
+  #cover.show {
+    display: block;
+  }
+  .zoom {
+    position: fixed;
+  }
+  #previmg,
+  #nextimg {
+    top: calc(50% - var(--size-px-5));
+  }
+  #previmg {
+    left: 1%;
+  }
+  #nextimg {
+    right: 1%;
+  }
+  .floatbtn {
+    position: fixed;
+    z-index: var(--z-panel);
+    width: var(--size-px-8);
+    height: var(--size-px-8);
+    display: grid;
+    place-items: center;
+    padding: 0;
+    border: 1px solid var(--stroke-1);
+    border-radius: var(--radius-round);
+    background-color: var(--panel-bg);
+    backdrop-filter: var(--blur-card);
+    color: var(--text-1);
+    box-shadow: var(--shadow-5);
+    cursor: pointer;
+    opacity: 0.55;
+    transition: opacity var(--dur-2) var(--ease-2),
+      background-color var(--dur-2) var(--ease-2), scale var(--dur-1) var(--ease-2);
+  }
+  .floatbtn:hover {
+    opacity: 1;
+    background-color: var(--popover-bg);
+  }
+  .floatbtn:active {
+    scale: 0.94;
+  }
+  .floatbtn svg {
+    width: var(--size-px-5);
+    height: var(--size-px-5);
+  }
+
+  /* ---------- 顶部工具栏 ---------- */
+  #toolbar {
+    position: fixed;
+    top: var(--size-px-2);
+    left: 50%;
+    z-index: var(--z-toolbar);
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: center;
+    gap: var(--size-px-2);
+    max-width: min(calc(100vw - 2 * var(--size-px-4)), 1200px);
+    padding: var(--size-px-2) var(--size-px-3);
+    border: 1px solid var(--stroke-1);
+    border-radius: var(--radius-3);
+    background-color: var(--panel-bg);
+    backdrop-filter: var(--blur-card);
+    box-shadow: var(--shadow-3);
+    opacity: 0;
+    translate: -50% calc(-1 * var(--size-px-3));
+    pointer-events: none;
+    transition: opacity var(--dur-2) var(--ease-2),
+      translate var(--dur-3) var(--ease-spring-2);
+  }
+  /* 默认 0.94，鼠标悬停时变为实心，浏览时存在感更弱 */
+  #toolbar.show {
+    opacity: 0.94;
+    translate: -50% 0;
+    pointer-events: auto;
+  }
+  #toolbar.show:hover {
+    opacity: 1;
+  }
+  /* 全屏 + 鼠标静止：连指针一起藏起来 */
+  :root.fs.idle,
+  :root.fs.idle * {
+    cursor: none;
+  }
+  .ic-compress {
+    display: none;
+  }
+  :root.fs .ic-expand {
+    display: none;
+  }
+  :root.fs .ic-compress {
+    display: block;
+  }
+  .tbtn,
+  .iconbtn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--size-px-2);
+    height: 34px;
+    border: 1px solid transparent;
+    border-radius: var(--radius-chip);
+    background-color: transparent;
+    color: var(--text-1);
+    font-size: var(--font-size-0);
+    font-weight: var(--font-weight-5);
+    white-space: nowrap;
+    cursor: pointer;
+    transition: background-color var(--dur-2) var(--ease-2),
+      color var(--dur-2) var(--ease-2), border-color var(--dur-2) var(--ease-2),
+      scale var(--dur-1) var(--ease-2);
+  }
+  .tbtn {
+    padding: 0 var(--size-px-3);
+  }
+  .iconbtn {
+    width: 34px;
+    padding: 0;
+  }
+  .tbtn:hover,
+  .iconbtn:hover {
+    background-color: var(--surface-hover);
+  }
+  .tbtn:active,
+  .iconbtn:active {
+    scale: 0.96;
+  }
+  .tbtn[aria-pressed="true"] {
+    background-color: var(--active-bg);
+    color: var(--active-fg);
+  }
+  #toolbar svg,
+  .panelhead svg,
+  #treehead svg {
+    width: 18px;
+    height: 18px;
+  }
+  /* 主题：顶栏三格切换（跟随系统 / 浅色 / 深色），当前项高亮 */
+  #thememodes {
+    display: flex;
+    flex: none;
+    gap: 2px;
+    padding: 2px;
+    border: 1px solid var(--stroke-1);
+    border-radius: var(--radius-chip);
+    background-color: var(--surface-1);
+  }
+  #thememodes > button {
+    display: grid;
+    place-items: center;
+    flex: none;
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: 8px;
+    background-color: transparent;
+    color: var(--text-2);
+    cursor: pointer;
+    transition: background-color var(--dur-2) var(--ease-2),
+      color var(--dur-2) var(--ease-2);
+  }
+  #thememodes > button:hover {
+    background-color: var(--surface-hover);
+    color: var(--text-1);
+  }
+  #thememodes > button[aria-pressed="true"] {
+    background-color: var(--active-bg);
+    color: var(--active-fg);
+  }
+  #thememodes svg {
+    display: block;
+    width: 16px;
+    height: 16px;
+  }
+  .ic-auto .half {
+    fill: currentColor;
+    stroke: none;
+  }
+  #toolbar .sep {
+    width: 1px;
+    height: 18px;
+    margin: 0;
+    background-color: var(--stroke-1);
+  }
+  /* 排序 / 顺序：原生 select 的弹层是浏览器画的、改不了圆角，
+     所以隐藏原生控件，用和右键菜单同一套外观的下拉按钮代替 */
+  #toolbar select[hidden] {
+    display: none;
+  }
+  .selbtn {
+    justify-content: space-between;
+    min-width: 104px;
+    padding: 0 var(--size-px-3) 0 var(--size-px-4);
+  }
+  .selbtn .caret {
+    flex: none;
+    width: 7px;
+    height: 7px;
+    border-right: 2px solid currentColor;
+    border-bottom: 2px solid currentColor;
+    rotate: 45deg;
+    translate: 0 -2px;
+    opacity: 0.65;
+  }
+  #counter {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    min-width: 76px;
+    padding: 0 var(--size-px-2);
+    font-size: var(--font-size-0);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-2);
+  }
+  #counter b {
+    color: var(--text-1);
+    font-weight: var(--font-weight-6);
+  }
+  #counter i {
+    font-style: normal;
+    opacity: 0.45;
+  }
+  #toolbar select {
+    height: 34px;
+    border-radius: var(--radius-chip);
+  }
+
+  /* ---------- 目录树 ---------- */
+  #treebar {
+    position: fixed;
+    top: 68px;
+    left: 0;
+    z-index: var(--z-panel);
+    border-right: 1px solid var(--stroke-1);
+    border-bottom: 1px solid var(--stroke-1);
+    border-radius: 0 var(--radius-card) var(--radius-card) 0;
+    background-color: var(--panel-bg);
+    backdrop-filter: var(--blur-panel);
+    box-shadow: var(--shadow-5);
+    display: none;
+  }
+  #treebar.show {
+    display: block;
+  }
+  #treehead {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    z-index: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--size-px-3);
+    height: 52px;
+    padding: 0 var(--size-px-3) 0 var(--size-px-4);
+    border-bottom: 1px solid var(--stroke-1);
+  }
+  #treehead .sub {
+    flex: 1;
+    font-size: var(--font-size-0);
+    color: var(--text-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  #dirtree {
+    position: absolute;
+    top: 52px;
+    width: calc(100% - 25px);
+    height: calc(100dvh - 120px);
+    direction: rtl;
+    overflow-y: scroll;
+    font-size: var(--font-size-0);
+    line-height: var(--font-lineheight-4);
+    padding-right: calc(50vw - 100%);
+  }
+  #dirtree > ul {
+    margin: 0;
+  }
+  #resizebar {
+    min-width: 200px;
+    max-width: 50vw;
+    resize: horizontal;
+    overflow: scroll;
+    opacity: 0.5;
+  }
+  #resizebar::-webkit-scrollbar {
+    width: 20px;
+    height: calc(100dvh - 68px);
+  }
+  #resizebar::-webkit-resizer {
+    background-color: var(--text-1);
+  }
+  ul {
+    direction: ltr;
+    margin: 0 0 0 var(--size-px-2);
+    padding: 0;
+    border-left: 1px solid var(--stroke-1);
+  }
+  li {
+    position: relative;
+    z-index: 1;
+    min-width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    list-style: "📁" inside;
+    padding: 2px var(--size-px-2);
+    border-radius: var(--radius-round);
+    cursor: pointer;
+    transition: background-color var(--dur-2) var(--ease-2),
+      color var(--dur-2) var(--ease-2), opacity var(--dur-2) var(--ease-2);
+  }
+  li:hover {
+    width: fit-content;
+    background-color: var(--surface-hover);
+  }
+  li.active {
+    background-color: var(--active-bg);
+    color: var(--active-fg);
+  }
+  li.visited {
+    opacity: 0.78;
+  }
+
+  /* ---------- 设置抽屉：分组 + 对齐的字段行 ---------- */
+  #sidebar {
+    position: fixed;
+    top: 68px;
+    left: -420px;
+    box-sizing: border-box;
+    width: 356px;
+    max-width: calc(100vw - 40px);
+    max-height: calc(100dvh - 80px);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    z-index: var(--z-panel);
+    display: flex;
+    flex-direction: column;
+    gap: var(--size-px-1);
+    padding: var(--size-px-4) var(--size-px-4) var(--size-px-5);
+    border: 1px solid var(--stroke-1);
+    border-left: none;
+    border-radius: 0 var(--radius-card) var(--radius-card) 0;
+    background-color: var(--panel-bg);
+    backdrop-filter: var(--blur-panel);
+    box-shadow: var(--shadow-5);
+    transition: left var(--dur-3) var(--ease-out-3);
+  }
+  #sidebar.show {
+    left: 0;
+  }
+  .panelhead {
+    display: flex;
+    align-items: center;
+    gap: var(--size-px-3);
+    min-height: 36px;
+    margin-bottom: var(--size-px-2);
+  }
+  .title {
+    font-size: var(--font-size-2);
+    font-weight: var(--font-weight-6);
+  }
+  .panelhead .sub {
+    flex: 1;
+    font-size: var(--font-size-0);
+    color: var(--text-3);
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  /* 头部没有 .sub 时（例如帮助卡片），关闭按钮也要靠右 */
+  .panelhead > .iconbtn {
+    margin-left: auto;
+  }
+  /* 分组小标题 */
+  .group {
+    margin-top: var(--size-px-3);
+    padding-top: var(--size-px-2);
+    border-top: 1px solid var(--stroke-1);
+    font-size: var(--font-size-0);
+    font-weight: var(--font-weight-6);
+    color: var(--text-3);
+    letter-spacing: var(--font-letterspacing-2);
+  }
+  #sidebar > .group:first-of-type {
+    margin-top: var(--size-px-1);
+    padding-top: 0;
+    border-top: none;
+  }
+  /* 一行一个设置：标签 / 控件 / 数值 */
+  .field {
+    display: grid;
+    grid-template-columns: 58px minmax(0, 1fr) 34px;
+    align-items: center;
+    gap: var(--size-px-3);
+    min-height: 30px;
+    font-size: var(--font-size-0);
+    color: var(--text-2);
+  }
+  .field.wide {
+    grid-template-columns: 58px minmax(0, 1fr);
+  }
+  .field > span {
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+  }
+  .field > b {
+    text-align: right;
+    font-weight: var(--font-weight-6);
+    color: var(--text-1);
+    font-variant-numeric: tabular-nums;
+  }
+  .field input[type="range"],
+  .field input[type="text"] {
+    width: 100%;
+    justify-self: stretch;
+    margin: 0;
+  }
+  /* 分段按钮组 */
+  .seg {
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--size-px-1);
+  }
+  .seg > button {
+    flex: 1 1 auto;
+    height: 28px;
+    padding: 0 var(--size-px-3);
+    font-size: var(--font-size-0);
+    font-weight: var(--font-weight-5);
+    white-space: nowrap;
+    border: 1px solid var(--stroke-1);
+    border-radius: var(--radius-round);
+    background-color: var(--surface-1);
+    color: var(--text-1);
+    cursor: pointer;
+    transition: background-color var(--dur-2) var(--ease-2),
+      border-color var(--dur-2) var(--ease-2), color var(--dur-2) var(--ease-2),
+      scale var(--dur-1) var(--ease-2);
+  }
+  .seg > button:hover {
+    background-color: var(--surface-hover);
+    border-color: var(--stroke-2);
+  }
+  .seg > button:active {
+    scale: 0.96;
+  }
+  .seg > button.active {
+    background-color: var(--active-bg);
+    border-color: transparent;
+    color: var(--active-fg);
+  }
+  /* 当前无效的开关（例如没开筛选时的「反转结果」）弱化，避免点了没反应还以为是坏了 */
+  .seg > button.muted {
+    opacity: 0.45;
+  }
+  .note {
+    margin-top: var(--size-px-3);
+    padding-top: var(--size-px-3);
+    border-top: 1px solid var(--stroke-1);
+    font-size: var(--font-size-0);
+    line-height: var(--font-lineheight-3);
+    color: var(--text-3);
+  }
+
+  /* ---------- 表单控件 ---------- */
+  select {
+    justify-self: center;
+    appearance: none;
+    height: 28px;
+    padding: 0 var(--size-px-5) 0 var(--size-px-3);
+    font-size: var(--font-size-0);
+    text-align: center;
+    color: var(--text-1);
+    cursor: pointer;
+    border: 1px solid var(--stroke-1);
+    border-radius: var(--radius-round);
+    background-color: var(--surface-1);
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23ffffff' stroke-width='2.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 9px center;
+    background-size: 10px 10px;
+    transition: background-color var(--dur-2) var(--ease-2),
+      border-color var(--dur-2) var(--ease-2);
+  }
+  select:hover {
+    background-color: var(--surface-hover);
+    border-color: var(--stroke-2);
+  }
+  select option {
+    background-color: var(--popover-bg);
+    color: var(--text-1);
+  }
+  [type="text"] {
+    justify-self: center;
+    width: 100%;
+    height: 28px;
+    padding: 0 var(--size-px-3);
+    outline: none;
+    text-align: center;
+    font-size: var(--font-size-0);
+    color: var(--text-1);
+    border: 1px solid var(--stroke-1);
+    border-radius: var(--radius-round);
+    background-color: var(--surface-1);
+    transition: background-color var(--dur-2) var(--ease-2),
+      border-color var(--dur-2) var(--ease-2), box-shadow var(--dur-2) var(--ease-2);
+  }
+  [type="text"]:hover {
+    border-color: var(--stroke-2);
+  }
+  [type="text"]:focus {
+    border-color: var(--accent);
+    background-color: var(--accent-soft);
+    box-shadow: var(--focus-ring);
+  }
+  [type="range"] {
+    appearance: none;
+    -webkit-appearance: none;
+    justify-self: stretch;
+    width: 100%;
+    height: 6px;
+    margin: 0;
+    border: none;
+    border-radius: var(--radius-round);
+    background-color: var(--surface-press);
+    accent-color: var(--accent);
+    cursor: pointer;
+    transition: background-color var(--dur-2) var(--ease-2);
+  }
+  [type="range"]:hover {
+    background-color: color-mix(in oklab, var(--text-1) 32%, transparent);
+  }
+  [type="range"]::-webkit-slider-thumb {
+    appearance: none;
+    -webkit-appearance: none;
+    width: var(--size-px-3);
+    height: var(--size-px-3);
+    border: none;
+    border-radius: var(--radius-round);
+    background-color: var(--text-1);
+    box-shadow: var(--shadow-2);
+    transition: scale var(--dur-2) var(--ease-2);
+  }
+  [type="range"]::-webkit-slider-thumb:hover {
+    scale: 1.18;
+  }
+  [type="range"]::-moz-range-thumb {
+    width: var(--size-px-3);
+    height: var(--size-px-3);
+    border: none;
+    border-radius: var(--radius-round);
+    background-color: var(--text-1);
+  }
+  [type="range"]::-moz-range-track {
+    height: 6px;
+    border-radius: var(--radius-round);
+    background: transparent;
+  }
+
+  /* ---------- 底部加载提示 ---------- */
+  #loadbar {
+    position: fixed;
+    left: 50%;
+    bottom: var(--size-px-3);
+    z-index: var(--z-panel);
+    padding: var(--size-px-1) var(--size-px-3);
+    border: 1px solid var(--stroke-1);
+    border-radius: var(--radius-round);
+    background-color: var(--panel-bg);
+    backdrop-filter: var(--blur-card);
+    box-shadow: var(--shadow-3);
+    font-size: var(--font-size-0);
+    font-variant-numeric: tabular-nums;
+    color: var(--text-2);
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    translate: -50% var(--size-px-3);
+    transition: opacity var(--dur-2) var(--ease-2),
+      translate var(--dur-3) var(--ease-out-3);
+  }
+  #loadbar.show {
+    opacity: 0.92;
+    translate: -50% 0;
+  }
+
+  /* ---------- 帮助 ---------- */
+  #help {
+    position: fixed;
+    inset: 0;
+    z-index: var(--z-help);
+    display: none;
+    place-items: center;
+    background-color: color-mix(in oklab, var(--bg) 74%, transparent);
+    backdrop-filter: var(--blur-soft);
+  }
+  #help.show {
+    display: grid;
+  }
+  #help .card {
+    width: min(560px, calc(100vw - var(--size-px-9)));
+    max-height: 84dvh;
+    overflow: auto;
+    padding: var(--size-px-5);
+    border: 1px solid var(--stroke-1);
+    border-radius: var(--radius-card);
+    background-color: var(--panel-bg);
+    box-shadow: var(--shadow-5);
+  }
+  .kblist {
+    display: grid;
+    gap: var(--size-px-1);
+  }
+  .kblist > div {
+    display: flex;
+    align-items: center;
+    gap: var(--size-px-2);
+    padding: var(--size-px-2) 0;
+    border-bottom: 1px solid var(--stroke-1);
+    font-size: var(--font-size-0);
+  }
+  .kblist > div > span {
+    flex: 1;
+    color: var(--text-2);
+  }
+  kbd {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    padding: 2px var(--size-px-2);
+    border: 1px solid var(--stroke-1);
+    border-radius: 6px;
+    background-color: var(--surface-1);
+    color: var(--text-1);
+  }
+  .kbtip {
+    margin-top: var(--size-px-3);
+    font-size: var(--font-size-0);
+    line-height: var(--font-lineheight-3);
+    color: var(--text-3);
+  }
+  /* 帮助底部的项目主页（href 留空时只是一行灰字，补上 href 才变成链接） */
+  .kbhome {
+    margin-top: var(--size-px-4);
+    padding-top: var(--size-px-3);
+    border-top: 1px solid var(--stroke-1);
+    font-size: var(--font-size-0);
+    color: var(--text-3);
+  }
+  .kbhome a {
+    color: var(--text-3);
+    text-decoration: none;
+  }
+  .kbhome a[href] {
+    color: var(--accent);
+    cursor: pointer;
+  }
+  .kbhome a[href]:hover {
+    text-decoration: underline;
+  }
+
+  /* ---------- 右键菜单 ---------- */
+  #ctxmenu {
+    position: fixed;
+    z-index: var(--z-menu);
+    display: none;
+    min-width: 208px;
+    padding: var(--size-px-3);
+    border: 1px solid var(--stroke-1);
+    border-radius: var(--radius-3);
+    background-color: var(--panel-bg);
+    backdrop-filter: var(--blur-card);
+    box-shadow: var(--shadow-5);
+  }
+  /* 显示时用纵向 flex：行与行之间留 2px 缝，
+     否则相邻的「选中」和「鼠标划过」两块圆角背景会连成一片 */
+  #ctxmenu.show {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  #ctxmenu button {
+    display: flex;
+    align-items: center;
+    gap: var(--size-px-2);
+    width: 100%;
+    height: 32px;
+    padding: 0 var(--size-px-3);
+    border: none;
+    border-radius: var(--radius-chip);
+    background-color: transparent;
+    color: var(--text-1);
+    font-size: var(--font-size-0);
+    text-align: left;
+    cursor: pointer;
+    transition: background-color var(--dur-1) var(--ease-2);
+  }
+  #ctxmenu button > span {
+    flex: 1;
+  }
+  #ctxmenu button:hover {
+    background-color: var(--surface-hover);
+  }
+  #ctxmenu button[data-active="true"] {
+    background-color: var(--surface-press);
+  }
+  /* 选中对勾使用矢量遮罩绘制，尺寸与颜色可控，比字体字符稳定 */
+  #ctxmenu button[data-active="true"]::after {
+    content: "";
+    flex: none;
+    width: 14px;
+    height: 14px;
+    background-color: var(--accent);
+    -webkit-mask: var(--check-mask) center / contain no-repeat;
+    mask: var(--check-mask) center / contain no-repeat;
+  }
+  #ctxmenu kbd {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-3);
+  }
+  #ctxmenu .sep {
+    display: block;
+    height: 1px;
+    margin: var(--size-px-1) var(--size-px-2);
+    background-color: var(--stroke-1);
+  }
+}
+
+@keyframes scrollmove {
+  from {
+    top: 0;
+  }
+  to {
+    top: calc(100dvh - 46px);
+  }
+}
+
+@layer utilities {
+  ::selection {
+    background-color: var(--active-bg);
+    color: var(--active-fg);
+  }
+}

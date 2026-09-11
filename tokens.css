@@ -1,0 +1,181 @@
+/* ============================================================================
+   应用语义层：在 Open Props 之上只做映射，不另造一套尺度
+   ----------------------------------------------------------------------------
+   三个文件的分工：
+     open-props.min.css   原子尺度，颜色 / 字号 / 间距 / 圆角 / 阴影 / 缓动 / 层级
+     tokens.css（本文件）  语义令牌，明暗两套，text / surface / stroke / panel 等
+     style.css            组件样式，只使用上面两层，不写魔法数字
+   主题由 <html data-theme="light|dark"> 控制，script.js 负责写入与记忆。
+   脚本未执行时按深色渲染，避免闪现白底。
+   ============================================================================ */
+
+@layer tokens, reset, components, utilities;
+
+@layer tokens {
+  /* 深色主题（默认） */
+  :root {
+    color-scheme: dark;
+
+    /* 画布与文字 */
+    --bg: black;
+    --text-1: var(--gray-0);
+    --text-2: color-mix(in oklab, var(--gray-0) 78%, transparent);
+    --text-3: color-mix(in oklab, var(--gray-0) 56%, transparent);
+
+    /* 表面与描边：面板不透明度提到 92%，亮照片上图标也压得住 */
+    --surface-1: color-mix(in oklab, var(--gray-9) 72%, transparent);
+    --surface-hover: color-mix(in oklab, var(--gray-0) 15%, transparent);
+    --surface-press: color-mix(in oklab, var(--gray-0) 24%, transparent);
+    --stroke-1: color-mix(in oklab, var(--gray-0) 16%, transparent);
+    --stroke-2: color-mix(in oklab, var(--gray-0) 34%, transparent);
+    --panel-bg: color-mix(in oklab, var(--gray-11) 92%, transparent);
+    --popover-bg: color-mix(in oklab, var(--gray-10) 97%, transparent);
+    --scrim: color-mix(in oklab, var(--gray-12) 90%, transparent);
+
+    /* 选中 / 反白：深浅主题方向相反，组件只管引用 */
+    --active-bg: var(--gray-0);
+    --active-fg: var(--gray-12);
+    --img-stroke: white;
+
+    /* 强调与焦点 */
+    --accent: var(--blue-6);
+    --accent-soft: color-mix(in oklab, var(--blue-6) 18%, transparent);
+    --focus-ring: 0 0 0 3px color-mix(in oklab, var(--blue-6) 36%, transparent);
+
+    /* 阴影强度：Open Props 默认按浅色主题给 1%，这里锁定深色档。
+       注意这两个不是"没人用"的令牌，而是 Open Props 计算 --shadow-1..6 的输入，
+       删掉会让下面用到的 --shadow-3/--shadow-5 退回默认强度。 */
+    --shadow-color: 220 40% 2%;
+    --shadow-strength: 25%;
+  }
+
+  /* 浅色主题 */
+  :root[data-theme="light"] {
+    color-scheme: light;
+
+    --bg: var(--gray-1);
+    --text-1: var(--gray-12);
+    --text-2: color-mix(in oklab, var(--gray-12) 76%, transparent);
+    --text-3: color-mix(in oklab, var(--gray-12) 54%, transparent);
+
+    --surface-1: color-mix(in oklab, var(--gray-12) 6%, transparent);
+    --surface-hover: color-mix(in oklab, var(--gray-12) 10%, transparent);
+    --surface-press: color-mix(in oklab, var(--gray-12) 16%, transparent);
+    --stroke-1: color-mix(in oklab, var(--gray-12) 14%, transparent);
+    --stroke-2: color-mix(in oklab, var(--gray-12) 30%, transparent);
+    --panel-bg: color-mix(in oklab, var(--gray-0) 92%, transparent);
+    --popover-bg: color-mix(in oklab, var(--gray-0) 98%, transparent);
+    --scrim: color-mix(in oklab, var(--gray-1) 92%, transparent);
+
+    --active-bg: var(--gray-12);
+    --active-fg: var(--gray-0);
+    --img-stroke: color-mix(in oklab, var(--gray-12) 16%, transparent);
+
+    --accent-soft: color-mix(in oklab, var(--blue-6) 14%, transparent);
+
+    /* 浅色主题用 Open Props 原本的浅色阴影档 */
+    --shadow-color: 220 3% 15%;
+    --shadow-strength: 1%;
+  }
+
+  /* 与主题无关的尺度 */
+  :root {
+    /* Open Props 没有模糊令牌，补三条玻璃材质（本项目唯一的自造原子） */
+    --blur-soft: blur(10px) saturate(150%);
+    --blur-card: blur(18px) saturate(165%);
+    --blur-panel: blur(26px) saturate(180%);
+
+    /* Open Props 只给动画内联时长，这里补三档过渡时长 */
+    --dur-1: 0.12s;
+    --dur-2: 0.2s;
+    --dur-3: 0.34s;
+
+    /* 对勾图标的矢量遮罩（下拉/右键菜单的选中项用，尺寸和颜色都由样式控制） */
+    --check-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='3.2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M20 6L9 17l-5-5'/%3E%3C/svg%3E");
+
+    /* 圆角与层级（引用 Open Props 的档位） */
+    --radius-chip: 10px; /* Open Props 档位是 2 / 5 / 16 / 32px，小控件补 10px */
+    --radius-card: var(--radius-4);
+    --z-panel: var(--layer-2);
+    --z-toolbar: var(--layer-3);
+    --z-help: var(--layer-4);
+    --z-menu: var(--layer-5);
+
+    /* 应用自身的布局参数（脚本会按用户设置覆盖成内联样式） */
+    --colgap: 0px;
+    --rowgap: 0px;
+    --imgradius: 0px;
+    --imgborder: 0px;
+  }
+
+  /* 高对比度偏好：描边与次要文字再加硬 */
+  @media (prefers-contrast: more) {
+    :root {
+      --text-2: color-mix(in oklab, var(--gray-0) 90%, transparent);
+      --text-3: color-mix(in oklab, var(--gray-0) 72%, transparent);
+      --stroke-1: color-mix(in oklab, var(--gray-0) 40%, transparent);
+      --panel-bg: color-mix(in oklab, var(--gray-11) 98%, transparent);
+    }
+    :root[data-theme="light"] {
+      --text-2: color-mix(in oklab, var(--gray-12) 88%, transparent);
+      --text-3: color-mix(in oklab, var(--gray-12) 70%, transparent);
+      --stroke-1: color-mix(in oklab, var(--gray-12) 38%, transparent);
+      --panel-bg: color-mix(in oklab, var(--gray-0) 99%, transparent);
+    }
+  }
+
+  /* 系统要求减少透明度时，退回不透明面板，保证可读性 */
+  @media (prefers-reduced-transparency: reduce) {
+    :root {
+      --panel-bg: var(--gray-11);
+      --popover-bg: var(--gray-10);
+      --surface-1: var(--gray-10);
+    }
+    :root[data-theme="light"] {
+      --panel-bg: var(--gray-0);
+      --popover-bg: var(--gray-0);
+      --surface-1: var(--gray-2);
+    }
+  }
+}
+
+@layer reset {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+  /* 脚本用 hidden 属性隐藏「目录」按钮，必须压过组件里的 display */
+  [hidden] {
+    display: none !important;
+  }
+  button,
+  input,
+  select,
+  textarea {
+    font: inherit;
+    color: inherit;
+  }
+  /* 图标统一为描边 + 跟随文字颜色。
+     ⚠️ 内联 SVG 的默认样式是 fill:black / stroke:none，深色面板上会几乎看不见，
+     所以这条规范化必须存在，不要删。 */
+  svg {
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 2;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+    }
+  }
+}

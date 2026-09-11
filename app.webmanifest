@@ -1,0 +1,25 @@
+{
+  "name": "Masonry Viewer Next",
+  "short_name": "图片浏览器",
+  "theme_color": "black",
+  "background_color": "black",
+  "start_url": "./",
+  "id": "Masonry_Image_Viewer",
+  "display": "standalone",
+  "scope": "./",
+  "icons": [
+    {
+      "src": "512x512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    },
+    {
+      "src": "192x192.png",
+      "type": "image/png",
+      "sizes": "192x192",
+      "purpose": "maskable"
+    }
+  ],
+  "description": "瀑布流本地图片浏览器，默认随机顺序，明暗主题跟随系统。",
+  "categories": ["photo"]
+}
