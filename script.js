@@ -467,6 +467,7 @@ function resetLibrary() {
   loadedcount.innerText = "0";
   totalcount.innerText = "0";
   treebtn.hidden = true; // 新文件夹可能没有子目录
+  minCol = undefined; // 网格要等 reflow 重建，期间滚动/缩放窗口不该往里塞图
   clearTree();
   imgbox.replaceChildren();
   setPanel(treebar, false);

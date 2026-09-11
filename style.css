@@ -155,6 +155,7 @@
   /* ---------- 瀑布流网格 ---------- */
   #imgbox {
     flex: 1;
+    min-width: 0; /* body 是 flex 容器，这里同样不能被图片的原始宽度顶开 */
     display: flex;
     flex-wrap: wrap;
     line-height: 0;
@@ -172,6 +173,10 @@
   }
   .imgcol {
     flex: 1;
+    /* 关键：flex 项默认 min-width: auto，会被图片的原始宽度顶开。
+       少了这行，缩略图生成前图片按 4000px 的原始尺寸撑列，看起来就是
+       「先每张占满一整行，等缩略图回来再慢慢收成几列」。 */
+    min-width: 0;
     display: flex;
     flex-direction: column;
     row-gap: var(--rowgap);
@@ -179,6 +184,7 @@
   .wrap {
     position: relative;
     cursor: pointer;
+    min-width: 0; /* 同上：横向等高的每一格也由 flex 尺寸决定，不被原图撑开 */
   }
   .wrap > img {
     width: 100%;
