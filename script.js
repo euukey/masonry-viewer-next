@@ -281,6 +281,7 @@ function initFlex() {
       arr.forEach((el) => getEl(el).classList.remove("active"));
       button.classList.add("active");
       reflow();
+      upgradeThumbs(); // 排版换了，格子宽度也变了
     };
   });
 }
@@ -292,6 +293,8 @@ function initConfig(id) {
     configs[id] = val;
     docEl.style.setProperty("--" + id, val + "px");
     localStorage.setItem(id, val);
+    // 列数或行高变了，格子大小跟着变，缩略图可能就不够用了
+    if (id === "colcount" || id === "minheight") upgradeThumbs();
   };
   let store = localStorage.getItem(id);
   if (store) input.value = store;
@@ -606,28 +609,57 @@ let thumbJobs = 0;
 function thumbWidth() {
   let cols = parseInt(colcountinput.value) || 1;
   let dpr = Math.min(window.devicePixelRatio || 1, 2);
-  return Math.max(480, Math.min(1600, Math.round((docEl.clientWidth / cols) * dpr * 1.2)));
+  // 按设备像素算，并留 25% 余量。列数调少时格子会变得很大，
+  // 缩略图不够大就会被浏览器二次放大，线条上会出锯齿。
+  let target = Math.round((docEl.clientWidth / cols) * dpr * 1.25);
+  return Math.max(640, Math.min(2560, target));
 }
-async function thumbBlob(file) {
-  if (file.thumb !== undefined) return file.thumb; // null = 不需要或生成失败
+// 这张图当前被画到多宽（设备像素）。排版、列数、窗口尺寸都会影响它。
+function neededThumbWidth(img) {
+  let dpr = Math.min(window.devicePixelRatio || 1, 2);
+  let w = img.getBoundingClientRect?.().width || 0;
+  return Math.max(thumbWidth(), Math.round(w * dpr * 1.05));
+}
+// 列数、窗口尺寸或排版变化后，屏幕上这些图可能比手里的缩略图还大，
+// 浏览器二次放大就会把线条放成锯齿，这里按实际显示尺寸补一遍。
+function upgradeThumbs() {
+  if (!totalcount.value) return;
+  imgbox.querySelectorAll("img").forEach((img) => {
+    let file = allData.get(img.path)?.file;
+    if (!file) return;
+    let need = neededThumbWidth(img);
+    if ((file.thumbW || 0) >= need) return;
+    let old = file.thumb;
+    thumbBlob(file, need).then((blob) => {
+      if ((blob || null) === (old || null)) return; // 还是同一份，不用动
+      img.isThumb = !!blob;
+      img.src = blob ? blobURL(blob) : blobURL(file);
+    });
+  });
+}
+async function thumbBlob(file, target = thumbWidth()) {
+  // 已经有够大的就直接用；列数来回改时不必重复转码。null = 不需要或生成失败
+  if (file.thumb !== undefined && (file.thumbW || 0) >= target) return file.thumb;
   file.thumb = null;
+  file.thumbW = target;
   if (typeof createImageBitmap !== "function" || typeof OffscreenCanvas !== "function")
     return null; // 环境不支持就退回原图
   let maxSide = Math.max(file.width || 0, file.height || 0);
-  let target = thumbWidth();
   if (!maxSide || maxSide <= target * 1.25) return null; // 本来就不大，直接用原图
   while (thumbJobs >= 4) await sleep(30); // 最多 4 张同时转码，避免一次几十张把 CPU 顶满
   thumbJobs++;
   try {
     let wide = (file.width || 0) >= (file.height || 0);
-    let opts = { resizeQuality: "low" };
+    // resizeQuality 默认是 low，缩小漫画 / 插画这类线条图时锯齿很明显，这里用 high
+    let opts = { resizeQuality: "high" };
     if (wide) opts.resizeWidth = target;
     else opts.resizeHeight = target;
     let bmp = await createImageBitmap(file, opts);
     let canvas = new OffscreenCanvas(bmp.width, bmp.height);
     canvas.getContext("2d").drawImage(bmp, 0, 0);
     bmp.close?.();
-    file.thumb = await canvas.convertToBlob({ type: "image/webp", quality: 0.85 });
+    // 0.85 会在平涂的边缘留下杂色，提到 0.92
+    file.thumb = await canvas.convertToBlob({ type: "image/webp", quality: 0.92 });
   } catch (e) {
     file.thumb = null;
   }
@@ -642,6 +674,7 @@ function maxInflight() {
   return Math.max(6, Math.round((parseInt(perload.value) || 25) * 1.2));
 }
 async function loadNext() {
+  if (!minCol) return; // 还没建过网格：首屏时滚动或缩放窗口会走到这里
   if (loading >= maxInflight()) return;
   if (!loadingAll) {
     let below = minCol.scrollHeight - (docEl.scrollTop + docEl.clientHeight);
@@ -1532,7 +1565,15 @@ resort.onclick = () => {
   reshuffle(); // 重排：随机模式下换一批随机顺序
   reflow();
 };
-window.onresize = loadNext;
+// 窗口尺寸变了要重新算缓冲，也要看看手里的缩略图还够不够大
+let resizeTimer;
+window.onresize = () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(() => {
+    loadNext();
+    upgradeThumbs();
+  }, 150);
+};
 imgbox.onclick = toggleZoom;
 document.onscroll = loadNext;
 document.ondragend = copyImg;
