@@ -110,6 +110,7 @@ let showcount = getEl("showcount");
 let sidebar = getEl("sidebar");
 let sidebtn = getEl("sidebtn");
 let sortby = getEl("sortby");
+let subdirs = getEl("subdirs");
 let toend = getEl("toend");
 let totalcount = getEl("totalcount");
 let totop = getEl("totop");
@@ -232,6 +233,21 @@ function initFilt() {
   syncRevert();
   updateFilterStat();
 }
+// 是否连同子文件夹一起读入：默认包含，关掉只读选中的这一层
+let subDirs = true;
+function syncSubDirs() {
+  subdirs.classList.toggle("active", subDirs);
+  subdirs.innerText = subDirs ? "包含子文件夹" : "仅当前文件夹";
+}
+function initSubDirs() {
+  subDirs = localStorage.getItem("subdirs") !== "false";
+  syncSubDirs();
+  subdirs.onclick = () => {
+    subDirs = !subDirs;
+    localStorage.setItem("subdirs", String(subDirs));
+    syncSubDirs();
+  };
+}
 // 悬停显示图片详情：设置里的开关，默认开
 function initHoverInfo() {
   hoverinfo.active = localStorage.getItem("hoverinfo") !== "false";
@@ -337,6 +353,7 @@ function fileListEntries(files) {
     // 这些文件就直接作为顶层条目，不至于一张都读不出来。
     let parts = (file.webkitRelativePath || "").split("/").filter(Boolean);
     if (parts.length) parts.shift(); // 去掉最外层那个被选中的文件夹本身
+    if (!subDirs && parts.length > 1) continue; // 只读当前层：子目录里的文件跳过
     let name = parts.pop() || file.name;
     let dir = root;
     for (let seg of parts) {
@@ -383,7 +400,11 @@ dirinput.onchange = async () => {
 // 打开完成后的统一收尾，按钮、拖入、粘贴与兼容模式共用
 function finishOpen() {
   if (!totalcount.value) {
-    notify("这个文件夹里没有找到图片");
+    notify(
+      subDirs
+        ? "这个文件夹里没有找到图片"
+        : "当前这一层没有图片，可在设置里改为包含子文件夹"
+    );
     return; // 空文件夹：保留首屏，便于重新选择
   }
   hint.remove();
@@ -438,6 +459,7 @@ function resetLibrary() {
   dircount = 0;
   loading = 0;
   loadingAll = 0;
+  readTick = 0; // 让下一次读取进度立刻显示
   showcount.innerText = "0";
   loadedcount.innerText = "0";
   totalcount.innerText = "0";
@@ -452,12 +474,30 @@ function resetLibrary() {
 function clearTree() {
   dirtree.children[0].replaceChildren();
 }
+// 读取大目录时给个进度，否则整棵树走完之前界面毫无动静，看着像卡死。
+// 限流 150ms，不至于每张图都写一次 DOM。
+let readTick = 0;
+function showReading() {
+  let now = Date.now();
+  if (now - readTick < 150) return;
+  readTick = now;
+  clearTimeout(loadbarTimer);
+  clearTimeout(notifyTimer);
+  loadtext.innerText =
+    "正在读取 " +
+    totalcount.value +
+    " 张图片" +
+    (dircount ? " · " + dircount + " 个文件夹" : "");
+  loadbar.classList.add("show");
+}
 async function handle(items, dir = "", folderUl = dirtree.children[0]) {
+  if (dir === "") showReading(); // 顶层开始读时先把提示亮出来
   for await (let item of items) {
     let name = item.name;
     let path = dir + "/" + name;
     if (allData.has(path)) continue;
     if (item.kind === "directory") {
+      if (!subDirs) continue; // 只读当前层：子目录直接跳过，目录树也就不会出现
       dircount++;
       let val = totalcount.value,
         index = val + dircount;
@@ -472,6 +512,7 @@ async function handle(items, dir = "", folderUl = dirtree.children[0]) {
       allData.set(path, index);
       li.pos = allData.size - 1; // 在遍历顺序里的位置，用于「跳到该文件夹」
       treebtn.hidden = false; // 有子目录才显示「目录」按钮
+      showReading();
       await handle(item.values(), path, ul);
       if (val === totalcount.value) {
         li.style.display = "none";
@@ -488,6 +529,7 @@ async function handle(items, dir = "", folderUl = dirtree.children[0]) {
       allData.set(path, { file });
       toLoad.push(path);
       totalcount.innerText = totalcount.value;
+      showReading();
     }
   }
   if (dir === "") showToolbar(4000); // 顶层列目录完成后再亮出工具栏
@@ -1473,6 +1515,7 @@ initSort();
 initFilt();
 initRatios();
 initHoverInfo();
+initSubDirs();
 initSelectMenu(sortby, "排序方式");
 initSelectMenu(order, "升序 / 降序");
 initHome();
