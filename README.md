@@ -3,7 +3,7 @@
   <h1>Masonry Viewer Next</h1>
   <p>打开本地文件夹就能看的瀑布流图片浏览器</p>
 
-![Platform](https://img.shields.io/badge/platform-Chrome%20%7C%20Edge-blue)
+![Platform](https://img.shields.io/badge/platform-Chrome%20%7C%20Edge%20%7C%20Firefox%20%7C%20Safari-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Dependencies](https://img.shields.io/badge/dependencies-0-brightgreen)
 ![Size](https://img.shields.io/badge/size-~250%20KB-brightgreen)
@@ -14,7 +14,7 @@
 
 ---
 
-纯静态页面，无框架，无构建步骤。不联网，不上传，图片只在本机打开。
+纯静态页面，无框架，无构建步骤。不联网，不上传，图片只在本机打开。本项目基于 wlm3201 的 [Masonry Image Viewer](https://github.com/wlm3201/Masonry_Image_Viewer) 修改，界面与交互都重写过。
 
 <!-- 截图：把界面截图放到 docs/ 下，再把下面这段的注释去掉
 <div align="center">
@@ -43,7 +43,8 @@
 
 | 浏览器 | 打开方式 | 可用功能 |
 | --- | --- | --- |
-| 桌面版 Chrome / Edge（86+） | 双击 `index.html` 或任意 http(s) 网址 | 全部功能：拖入文件夹、拖出复制、安装为桌面应用 |
+| 桌面版 Chrome / Edge（86+） | 双击 `index.html` | 除「安装为桌面应用」与离线缓存外，其余功能全部可用 |
+| 桌面版 Chrome / Edge（86+） | 任意 http(s) 网址（GitHub Pages 或本地服务器） | 全部功能：拖入文件夹、拖出复制、安装为桌面应用、离线缓存 |
 | Firefox / Safari | 双击 `index.html` | 兼容模式，使用传统文件夹选择器；不支持拖入文件夹、拖出复制、安装为应用 |
 | 手机 / 平板 | 系统文件选择器 | 只能逐张选图，图片平铺显示，没有文件夹与目录结构 |
 
