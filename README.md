@@ -14,7 +14,7 @@
 
 ---
 
-纯静态页面，无框架，无构建步骤。不联网，不上传，图片只在本机打开。本项目基于 wlm3201 的 [Masonry Image Viewer](https://github.com/wlm3201/Masonry_Image_Viewer) 修改，界面与交互都重写过。
+纯静态页面，无框架，无构建步骤。不联网，不上传，图片只在本机打开。本项目基于 wlm3201 的 [Masonry Image Viewer](https://github.com/wlm3201/Masonry_Image_Viewer) 二次开发，重新设计了界面与加载流程。
 
 <!-- 截图：把界面截图放到 docs/ 下，再把下面这段的注释去掉
 <div align="center">
