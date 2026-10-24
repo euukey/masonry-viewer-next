@@ -310,30 +310,32 @@ async function loadFromHandles(items) {
     notify("当前浏览器不支持拖入文件夹，请用「打开」选择，或改用 Chrome / Edge");
     return;
   }
-  let handles = [];
-  for (let item of items) {
-    try {
-      handles.push(await item.getAsFileSystemHandle());
-    } catch (e) {
-      // 个别条目拿不到句柄就跳过，不影响其它
-    }
+  // getAsFileSystemHandle 必须在拖放处理的同一 tick 内发起，中间不能 await：
+  // 超时之后浏览器返回的是 null 而不是抛错，catch 接不住。所以先全部发起，再统一等结果。
+  let pending = items
+    .filter((item) => item && item.kind === "file")
+    .map((item) => item.getAsFileSystemHandle().catch(() => null));
+  let handles = (await Promise.all(pending)).filter(Boolean);
+  if (!handles.length) {
+    notify("没能读取拖入的内容，请改用「打开」选择文件夹");
+    return;
   }
-  if (!handles.length) return;
   resetLibrary(); // 拖入 = 打开这个文件夹，替换掉当前图库
   try {
     await handle(handles);
   } catch (e) {
+    openError = true;
     notify("读取时出错：" + (e?.message || e));
   }
   finishOpen();
 }
 document.ondrop = async (e) => {
-  if (e.dataTransfer.types[0] !== "Files") return;
+  if (![...e.dataTransfer.types].includes("Files")) return;
   e.preventDefault();
   await loadFromHandles([...e.dataTransfer.items]);
 };
 document.onpaste = async (e) => {
-  if (e.clipboardData.types[0] !== "Files") return;
+  if (![...e.clipboardData.types].includes("Files")) return;
   await loadFromHandles([...e.clipboardData.items]);
 };
 hint.onclick = (e) => {
@@ -396,20 +398,27 @@ dirinput.onchange = async () => {
   try {
     await handle(fileListEntries(files));
   } catch (e) {
+    openError = true;
     notify("读取文件夹时出错：" + (e?.message || e));
   }
   finishOpen();
 };
+// 读取过程中是否已经报过错。报过错就不再补「没有图片」的空态提示，
+// 否则后一句会把真正的原因盖掉
+let openError = false;
 // 打开完成后的统一收尾，按钮、拖入、粘贴与兼容模式共用
 function finishOpen() {
   if (!totalcount.value) {
-    notify(
-      subDirs
-        ? "这个文件夹里没有找到图片"
-        : "当前这一层没有图片，可在设置里改为包含子文件夹"
-    );
+    if (!openError)
+      notify(
+        subDirs
+          ? "这个文件夹里没有找到图片"
+          : "当前这一层没有图片，可在设置里改为包含子文件夹"
+      );
+    openError = false;
     return; // 空文件夹：保留首屏，便于重新选择
   }
+  openError = false;
   hint.remove();
   reflow();
   showToolbar(4000);
@@ -1486,6 +1495,7 @@ async function openFolder() {
   try {
     await handle(dir.values());
   } catch (e) {
+    openError = true;
     notify("读取文件夹时出错：" + (e?.message || e));
   }
   finishOpen();
