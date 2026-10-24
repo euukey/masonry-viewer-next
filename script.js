@@ -596,7 +596,9 @@ function reflow(index = 0) {
   }
   imgbox.replaceChildren(...imgcols);
   loading = 0;
-  if (showcount.value > 0) {
+  // 队列要按「全部已读到的文件」重建，否则上一轮被筛掉的图再也回不来：
+  // 筛到 0 张时 showcount 也是 0，只看它就等于永远不重建，清除筛选后页面是一片空白
+  if (allData.size && (showcount.value > 0 || !toLoad.items.length)) {
     toLoad.getters.forEach((rsv) => rsv());
     toLoad.items = [...allData.keys()];
     showcount.value = 0;
@@ -705,7 +707,11 @@ async function loadNext() {
   let gen = libGen; // 记下当前图库代数
   for (let _ of Array(parseInt(perload.value))) {
     let path = await toLoad.shift();
-    if (!path) return;
+    if (!path) {
+      // 队列空了就把结果说清楚：筛到 0 张时不能停在“加载中”
+      updateLoadBar();
+      return;
+    }
     if (gen !== libGen) return; // 期间换过文件夹，这一轮作废
     let data = allData.get(path);
     if (typeof data === "number") {
@@ -717,7 +723,12 @@ async function loadNext() {
       continue;
     }
     let file = data.file;
-    if (sizeOut(file.size)) continue; // 大小先判：File 自带 size，不必读文件头
+    if (sizeOut(file.size)) {
+      // 大小先判：File 自带 size，不必读文件头。全被筛掉时队列会停在空，
+      // 这里补一次刷新，底部才不会一直挂着“加载中”
+      if (!toLoad.items.length) updateLoadBar();
+      continue;
+    }
     let img = data.img;
     let [w, h] = [file.width, file.height];
     // 渐进占位需要尺寸；宽高比过滤也需要尺寸
@@ -729,7 +740,10 @@ async function loadNext() {
       [file.width, file.height] = [w, h];
       if (got[2]) img = data.img = got[2];
     }
-    if (maxR && (h * minR > w + 2 || h * maxR < w - 2)) continue;
+    if (maxR && (h * minR > w + 2 || h * maxR < w - 2)) {
+      if (!toLoad.items.length) updateLoadBar(); // 同上：整批筛空也要把提示改掉
+      continue;
+    }
     // 随机模式：这一批目录标记挂在流里紧随其后的这张图上
     let pend = marksInOrder ? marks.splice(0) : null;
     let wrap = data.wrap;
@@ -816,19 +830,34 @@ async function loadNext() {
   }
   setTimeout(loadNext, 0);
 }
+// 有没有在筛（宽高比、大小、单色、描边任一开着）
+function anyFilter() {
+  return !!(filtmono.active || filtborder.active || sizeFilterOn() || maxR);
+}
 // 底部那条很轻的加载提示：加载中显示进度，全部加载完短暂提示后自动消失
 let loadbarTimer;
 function updateLoadBar() {
   updateFilterStat(); // 设置面板里的筛选状态与这里同步刷新
   let busy = loading > 0 || (loadingAll && toLoad.items.length > 0);
+  let filted = anyFilter();
+  let hit = showcount.value;
   if (busy) {
-    loadtext.innerText = "加载中 " + showcount.value + " / " + totalcount.value;
+    loadtext.innerText = filted
+      ? "加载中，命中 " + hit + " 张"
+      : "加载中 " + hit + " / " + totalcount.value;
     loadbar.classList.add("show");
     clearTimeout(loadbarTimer);
     return;
   }
   if (totalcount.value > 0 && !toLoad.items.length) {
-    loadtext.innerText = "已全部加载 " + totalcount.value + " 张";
+    // 筛选条件下一张都没命中时别说「已全部加载」，会让人以为图库空了
+    if (filted && hit < totalcount.value) {
+      loadtext.innerText = hit
+        ? "命中 " + hit + " / " + totalcount.value + " 张"
+        : "没有符合这个条件的图片";
+    } else {
+      loadtext.innerText = "已全部加载 " + totalcount.value + " 张";
+    }
     loadbar.classList.add("show");
     clearTimeout(loadbarTimer);
     loadbarTimer = setTimeout(() => loadbar.classList.remove("show"), 1600);
