@@ -230,8 +230,8 @@ function initFilt() {
       localStorage.setItem(button.id, button.active);
       syncRevert();
       updateFilterStat();
-      if (!filtmono.active && !filtborder.active && !sizeFilterOn() && revert.active)
-    return;
+      // 每次切换都重建：关掉最后一个筛选时得把被丢掉的图捡回来。
+      // 以前只在「有筛选或有反转」时才重建，反转单独开着就等于什么都不做
       reflow();
     };
   });
@@ -319,7 +319,16 @@ async function loadFromHandles(items) {
   // 超时之后浏览器返回的是 null 而不是抛错，catch 接不住。所以先全部发起，再统一等结果。
   let pending = items
     .filter((item) => item && item.kind === "file")
-    .map((item) => item.getAsFileSystemHandle().catch(() => null));
+    .map((item) => {
+      try {
+        let p = item.getAsFileSystemHandle();
+        return p ? p.catch(() => null) : null;
+      } catch (e) {
+        // 同步抛错：接不上 .catch()，会变成 unhandledRejection 且界面一句提示都没有
+        openError = true;
+        return null;
+      }
+    });
   let handles = (await Promise.all(pending)).filter(Boolean);
   if (!handles.length) {
     notify("没能读取拖入的内容，请改用「打开」选择文件夹");
@@ -492,6 +501,20 @@ function resetLibrary() {
   imgbox.replaceChildren();
   setPanel(treebar, false);
   if (cover.classList.contains("show")) hideCover();
+  // 换文件夹时旧筛选一律清掉：否则新库可能直接命中 0 张，看着像打开失败。
+  // 这几个条件本来也会存进 localStorage，得一起改掉，下次打开才不会又套回来
+  minsize.value = maxsize.value = "";
+  minSize = maxSize = 0;
+  [filtmono, filtborder, revert].forEach((el) => {
+    el.active = false;
+    el.classList.remove("active");
+    localStorage.setItem(el.id, false);
+  });
+  aspectratio.value = "";
+  minR = maxR = undefined;
+  syncSizeChips();
+  syncRatioChips();
+  syncRevert();
   updateLoadBar();
 }
 // 清空目录树（保留那个 <ul> 容器）
@@ -577,8 +600,6 @@ function randomize(items) {
   return items.map((p) => (typeof allData.get(p) === "object" ? queue[i++] : p));
 }
 function reflow(index = 0) {
-  if (!filtmono.active && !filtborder.active && !sizeFilterOn() && revert.active)
-    return;
   imgbox.querySelectorAll(".mark").forEach((el) => {
     el.remove();
   });
@@ -595,14 +616,18 @@ function reflow(index = 0) {
     }
   }
   imgbox.replaceChildren(...imgcols);
+  // 在途的 onImg 回调统一作废：否则它们在 reflow 之后还会把 loading 减成负数，
+  // maxInflight() 闸门随之失效，旧图也会被塞进新网格
+  libGen++;
   loading = 0;
-  // 队列要按「全部已读到的文件」重建，否则上一轮被筛掉的图再也回不来：
-  // 筛到 0 张时 showcount 也是 0，只看它就等于永远不重建，清除筛选后页面是一片空白
-  if (allData.size && (showcount.value > 0 || !toLoad.items.length)) {
-    toLoad.getters.forEach((rsv) => rsv());
-    toLoad.items = [...allData.keys()];
-    showcount.value = 0;
-  }
+  // 队列按「全部已读到的文件」重建：上一轮被筛掉的图要能回来，而筛到 0 张时
+  // showcount 也是 0，只看它就等于永远不重建。等待唤醒的 getter 一并清掉，
+  // 留着会让后续 push 的条目被已经没人等的 Promise 吞掉
+  toLoad.getters.forEach((rsv) => rsv());
+  toLoad.getters = [];
+  toLoad.items = [...allData.keys()];
+  showcount.value = 0;
+  showcount.innerText = "0";
   if (index > 0) toLoad.items = toLoad.items.slice(index);
   let key = sortby.value;
   marksInOrder = key === enums.random ? 1 : 0;
@@ -706,6 +731,9 @@ async function loadNext() {
   }
   let gen = libGen; // 记下当前图库代数
   for (let _ of Array(parseInt(perload.value))) {
+    // 队列见底时先把结果说清楚：命中缓存的分支只调 loadImg 就 continue，
+    // 不走解码回调，底部提示会一直停在上一次的文案上
+    if (!toLoad.items.length) updateLoadBar();
     let path = await toLoad.shift();
     if (!path) {
       // 队列空了就把结果说清楚：筛到 0 张时不能停在“加载中”
@@ -718,6 +746,11 @@ async function loadNext() {
       let mark = newEl("div");
       mark.className = "mark"; // 让 reflow 能清理上一轮残留的目录标记
       mark.index = data;
+      // 标记要显示目录名：以前只建了个空 div、也没有任何样式，等于看不见。
+      // 用 textContent 而不是 innerText：目录树里空目录的 li 是 display:none，
+      // innerText 对它返回空字符串，标记就会跟着空白
+      let treeLi = getEl("li" + data);
+      mark.textContent = treeLi ? treeLi.textContent : "";
       dirObs.observe(mark);
       marks.push(mark);
       continue;
@@ -919,10 +952,13 @@ function addInfo(e) {
 }
 function loadImg(wrap, pend) {
   let img = wrap.children[0];
-  if (
-    ((filtmono.active && isMono(img)) ||
-      (filtborder.active && isMonoBorder(img))) ^ revert.active
-  ) {
+  // 「黑白漫画」「纯色边框」都是只显示命中的那张，勾了「反转结果」才反过来。
+  // 以前写成 match ^ revert 为真就丢：两项都没开时 revert 会把整库丢光，
+  // 开了黑白漫画反而留下彩色图，跟按钮说明正好相反
+  let match =
+    (filtmono.active && isMono(img)) ||
+    (filtborder.active && isMonoBorder(img));
+  if ((filtmono.active || filtborder.active) && match === revert.active) {
     if (pend?.length) marks.unshift(...pend); // 过滤掉的图片交给下一张
     return;
   }
@@ -1335,7 +1371,7 @@ function initSizes() {
 }
 // 筛选状态：判读进度与命中数量。彩色照片开启「黑白漫画」通常为 0 命中
 function updateFilterStat() {
-  let on = filtmono.active || filtborder.active || sizeFilterOn();
+  let on = filtmono.active || filtborder.active || sizeFilterOn() || !!maxR;
   if (!on) {
     filtstat.innerText = "未启用筛选";
     return;
@@ -1343,14 +1379,17 @@ function updateFilterStat() {
   let busy = loading > 0 || toLoad.items.length > 0;
   let hit = showcount.value;
   let all = totalcount.value;
-  let rev = revert.active ? "（已反转）" : "";
+  let rev =
+    (filtmono.active || filtborder.active) && revert.active ? "（已反转）" : "";
   let size = sizeFilterOn() ? "大小 " + sizeLabel() + "，" : "";
+  // 宽高比也是筛选条件，状态条不能不提它
+  let cond = size + (maxR ? "宽高比，" : "");
   if (busy) {
     filtstat.innerText =
       "筛选中" +
       rev +
       "：" +
-      size +
+      cond +
       "已判读 " +
       loadedcount.value +
       " / " +
@@ -1360,12 +1399,12 @@ function updateFilterStat() {
       " 张";
   } else if (!hit) {
     filtstat.innerText =
-      size +
+      cond +
       "已判读 " +
       all +
       " 张，没有符合条件的图片（点上面的按钮取消筛选）";
   } else {
-    filtstat.innerText = size + "共 " + all + " 张，命中 " + hit + " 张" + rev;
+    filtstat.innerText = cond + "共 " + all + " 张，命中 " + hit + " 张" + rev;
   }
 }
 // 没开任何筛选时「反转结果」是无效的，弱化显示避免误解
@@ -1420,6 +1459,7 @@ function setSort(key) {
   reflow();
   showToolbar();
 }
+let jumpTimer;
 function jumpToDir(li) {
   if (li.pos === undefined) return;
   if (sortby.value !== enums.default && sortby.value !== enums.random) {
@@ -1430,6 +1470,13 @@ function jumpToDir(li) {
   setPanel(treebar, false);
   reflow(li.pos);
   docEl.scrollTo(0, 0);
+  // 筛选开着时可能跳进一个「有图但全被排除」的目录：画面空着又没有任何解释
+  clearTimeout(jumpTimer);
+  if (anyFilter())
+    jumpTimer = setTimeout(() => {
+      if (!imgbox.querySelector(".wrap"))
+        notify("这个目录里的图片都被筛选条件排除了，可在设置面板里取消筛选");
+    }, 400);
 }
 function toggleFullscreen() {
   if (document.fullscreenElement) document.exitFullscreen();

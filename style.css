@@ -262,6 +262,27 @@
     font-size: var(--font-size-0);
     color: color-mix(in oklab, var(--text-1) 68%, transparent);
   }
+  /* 目录标记：随机/日期排序下图片顺序与目录不再连续，靠这个小标签说明
+     「从这张图开始换目录了」。以前这个元素既没有文字也没有样式，等于不可见 */
+  .wrap > .mark {
+    position: absolute;
+    top: var(--size-px-3);
+    left: var(--size-px-3);
+    max-width: calc(100% - var(--size-px-6));
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    padding: 0 var(--size-px-3);
+    font-size: var(--font-size-0);
+    line-height: var(--font-lineheight-3);
+    color: var(--text-1);
+    background-color: var(--popover-bg);
+    border-radius: var(--radius-2);
+    pointer-events: none;
+  }
+  .wrap > .mark:empty {
+    display: none;
+  }
 
   /* ---------- 灯箱 ---------- */
   #cover {
