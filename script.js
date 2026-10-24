@@ -128,6 +128,9 @@ let modelight = getEl("modelight");
 let fsbtn = getEl("fsbtn");
 let hoverinfo = getEl("hoverinfo");
 let ratiopresets = getEl("ratiopresets");
+let minsize = getEl("minsize");
+let maxsize = getEl("maxsize");
+let sizepresets = getEl("sizepresets");
 let filtstat = getEl("filtstat");
 let loadbar = getEl("loadbar");
 let loadtext = getEl("loadtext");
@@ -146,6 +149,7 @@ let flextype;
 let currdir;
 let minCol;
 let minR, maxR;
+let minSize = 0, maxSize = 0; // 大小筛选，单位字节，0 表示这一侧不限
 let held = false;
 totalcount.value = 0;
 loadedcount.value = 0;
@@ -226,7 +230,8 @@ function initFilt() {
       localStorage.setItem(button.id, button.active);
       syncRevert();
       updateFilterStat();
-      if (!filtmono.active && !filtborder.active && revert.active) return;
+      if (!filtmono.active && !filtborder.active && !sizeFilterOn() && revert.active)
+    return;
       reflow();
     };
   });
@@ -572,7 +577,8 @@ function randomize(items) {
   return items.map((p) => (typeof allData.get(p) === "object" ? queue[i++] : p));
 }
 function reflow(index = 0) {
-  if (!filtmono.active && !filtborder.active && revert.active) return;
+  if (!filtmono.active && !filtborder.active && !sizeFilterOn() && revert.active)
+    return;
   imgbox.querySelectorAll(".mark").forEach((el) => {
     el.remove();
   });
@@ -711,6 +717,7 @@ async function loadNext() {
       continue;
     }
     let file = data.file;
+    if (sizeOut(file.size)) continue; // 大小先判：File 自带 size，不必读文件头
     let img = data.img;
     let [w, h] = [file.width, file.height];
     // 渐进占位需要尺寸；宽高比过滤也需要尺寸
@@ -1210,9 +1217,96 @@ function initRatios() {
   aspectratio.addEventListener("input", syncRatioChips);
   syncRatioChips();
 }
+// 大小筛选：输入按 KB 算，也可以写 2M / 1.5m / 512k；留空或 0 表示这一侧不限
+function parseSizeKB(raw) {
+  let s = String(raw || "").trim().toLowerCase();
+  if (!s) return 0;
+  let m = s.match(/^(\d+(?:\.\d+)?)\s*([kmg])?b?$/);
+  if (!m) return NaN;
+  let unit = m[2] === "m" ? MB : m[2] === "g" ? GB : 1024; // 不写单位就是 KB
+  return Math.round(parseFloat(m[1]) * unit);
+}
+function sizeFilterOn() {
+  return !!(minSize || maxSize);
+}
+// 去掉 formatSize 的小数零：200.00 KB → 200 KB
+function sizeText(bytes) {
+  return formatSize(bytes)
+    .replace(/\.0+ /, " ")
+    .replace(/(\.\d*[1-9])0+ /, "$1 ");
+}
+// 状态条里的说法：200 KB 至 2 MB / ≥ 2 MB / ≤ 200 KB
+function sizeLabel() {
+  let lo = minSize ? sizeText(minSize) : "";
+  let hi = maxSize ? sizeText(maxSize) : "";
+  if (lo && hi) return lo + " 至 " + hi;
+  return lo ? "≥ " + lo : "≤ " + hi;
+}
+// 大小不符就别加载了：File 自带 size，不用读文件头，也比宽高比更早
+function sizeOut(bytes) {
+  if (!sizeFilterOn()) return false;
+  let b = bytes || 0;
+  return (minSize && b < minSize) || (maxSize && b > maxSize);
+}
+function syncSizeChips() {
+  sizepresets.querySelectorAll("button").forEach((b) => {
+    if (!b.dataset.size) return;
+    let [a, z] = b.dataset.size.split("-");
+    b.classList.toggle(
+      "active",
+      (a ? parseSizeKB(a) : 0) === minSize && (z ? parseSizeKB(z) : 0) === maxSize
+    );
+  });
+}
+// 两个框都按 KB 填：回车或离开输入框生效，写反了自动对调，写错了清空
+function syncSize() {
+  let lo = parseSizeKB(minsize.value);
+  let hi = parseSizeKB(maxsize.value);
+  if (Number.isNaN(lo)) {
+    minsize.value = "";
+    lo = 0;
+  }
+  if (Number.isNaN(hi)) {
+    maxsize.value = "";
+    hi = 0;
+  }
+  if (lo && hi && lo > hi) {
+    [lo, hi] = [hi, lo];
+    minsize.value = lo / 1024;
+    maxsize.value = hi / 1024;
+  }
+  minSize = lo;
+  maxSize = hi;
+  syncSizeChips();
+  updateFilterStat();
+  reflow();
+}
+function initSizes() {
+  sizepresets.querySelectorAll("button").forEach((btn) => {
+    btn.onclick = () => {
+      if (btn.dataset.clear) minsize.value = maxsize.value = "";
+      else {
+        let [a, z] = btn.dataset.size.split("-");
+        minsize.value = a && a !== "0" ? a : "";
+        maxsize.value = z || "";
+      }
+      syncSize(); // 内部会刷新状态与排版
+      showToolbar();
+    };
+  });
+  [minsize, maxsize].forEach((input) => {
+    input.onchange = syncSize;
+    input.onkeydown = (e) => {
+      if (e.key !== "Enter") return;
+      e.preventDefault();
+      syncSize();
+      input.blur();
+    };
+  });
+}
 // 筛选状态：判读进度与命中数量。彩色照片开启「黑白漫画」通常为 0 命中
 function updateFilterStat() {
-  let on = filtmono.active || filtborder.active;
+  let on = filtmono.active || filtborder.active || sizeFilterOn();
   if (!on) {
     filtstat.innerText = "未启用筛选";
     return;
@@ -1221,11 +1315,14 @@ function updateFilterStat() {
   let hit = showcount.value;
   let all = totalcount.value;
   let rev = revert.active ? "（已反转）" : "";
+  let size = sizeFilterOn() ? "大小 " + sizeLabel() + "，" : "";
   if (busy) {
     filtstat.innerText =
       "筛选中" +
       rev +
-      "：已判读 " +
+      "：" +
+      size +
+      "已判读 " +
       loadedcount.value +
       " / " +
       all +
@@ -1234,9 +1331,12 @@ function updateFilterStat() {
       " 张";
   } else if (!hit) {
     filtstat.innerText =
-      "已判读 " + all + " 张，没有符合条件的图片（点上面的按钮取消筛选）";
+      size +
+      "已判读 " +
+      all +
+      " 张，没有符合条件的图片（点上面的按钮取消筛选）";
   } else {
-    filtstat.innerText = "共 " + all + " 张，命中 " + hit + " 张" + rev;
+    filtstat.innerText = size + "共 " + all + " 张，命中 " + hit + " 张" + rev;
   }
 }
 // 没开任何筛选时「反转结果」是无效的，弱化显示避免误解
@@ -1565,6 +1665,7 @@ initFlex();
 initSort();
 initFilt();
 initRatios();
+initSizes();
 initHoverInfo();
 initSubDirs();
 initSelectMenu(sortby, "排序方式");

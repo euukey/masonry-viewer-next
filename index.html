@@ -292,6 +292,43 @@
           <button data-clear="1" title="清空宽高比筛选">清除</button>
         </div>
       </div>
+      <div class="field wide">
+        <span>图片大小</span>
+        <div class="pair">
+          <input
+            type="text"
+            id="minsize"
+            placeholder="最小"
+            title="按 KB 填，也可以写 2M 表示 2 MB。留空表示这一侧不限，回车或点开别处生效。"
+          />
+          <em>至</em>
+          <input
+            type="text"
+            id="maxsize"
+            placeholder="最大"
+            title="按 KB 填，也可以写 2M 表示 2 MB。留空表示这一侧不限，回车或点开别处生效。"
+          />
+          <em>KB</em>
+        </div>
+      </div>
+      <div class="field wide">
+        <span>常用大小</span>
+        <div class="seg" id="sizepresets">
+          <button data-size="0-200" title="小于 200 KB，多是表情包、聊天截图">
+            小图
+          </button>
+          <button data-size="200-2048" title="200 KB 到 2 MB，普通的照片与插画">
+            中等
+          </button>
+          <button data-size="2048-" title="大于 2 MB，多是原图与壁纸">
+            大图
+          </button>
+          <button data-size="10240-" title="大于 10 MB，多是相机原片、4K 壁纸">
+            超大
+          </button>
+          <button data-clear="1" title="清空大小筛选">清除</button>
+        </div>
+      </div>
       <div class="note" id="filtstat">未启用筛选</div>
 
       <div class="group">加载与跳转</div>

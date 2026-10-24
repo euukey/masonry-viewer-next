@@ -687,6 +687,19 @@
     color: var(--text-1);
     font-variant-numeric: tabular-nums;
   }
+  /* 大小筛选：最小 至 最大，右侧标单位 */
+  .field .pair {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--size-px-2);
+    color: var(--text-3);
+  }
+  .field .pair em {
+    font-style: normal;
+    font-size: var(--font-size-0);
+    white-space: nowrap;
+  }
   .field input[type="range"],
   .field input[type="text"] {
     width: 100%;
