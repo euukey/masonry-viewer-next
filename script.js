@@ -320,6 +320,7 @@ async function loadFromHandles(items) {
     notify("没能读取拖入的内容，请改用「打开」选择文件夹");
     return;
   }
+  openSource = "drop";
   resetLibrary(); // 拖入 = 打开这个文件夹，替换掉当前图库
   try {
     await handle(handles);
@@ -394,6 +395,7 @@ function openFolderCompat() {
 dirinput.onchange = async () => {
   let files = [...dirinput.files];
   if (!files.length) return;
+  openSource = "picker";
   resetLibrary();
   try {
     await handle(fileListEntries(files));
@@ -406,13 +408,17 @@ dirinput.onchange = async () => {
 // 读取过程中是否已经报过错。报过错就不再补「没有图片」的空态提示，
 // 否则后一句会把真正的原因盖掉
 let openError = false;
+// 这次是点了「打开文件夹」（picker）还是拖入 / 粘贴（drop），空态提示据此措辞
+let openSource = "picker";
 // 打开完成后的统一收尾，按钮、拖入、粘贴与兼容模式共用
 function finishOpen() {
   if (!totalcount.value) {
     if (!openError)
       notify(
         subDirs
-          ? "这个文件夹里没有找到图片"
+          ? openSource === "drop"
+            ? "拖入的内容里没有找到图片"
+            : "这个文件夹里没有找到图片"
           : "当前这一层没有图片，可在设置里改为包含子文件夹"
       );
     openError = false;
@@ -1491,6 +1497,7 @@ async function openFolder() {
     openFolderCompat();
     return;
   }
+  openSource = "picker";
   resetLibrary();
   try {
     await handle(dir.values());

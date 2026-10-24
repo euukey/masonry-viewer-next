@@ -77,6 +77,12 @@
     font-size: var(--font-size-0);
     color: var(--text-2);
   }
+  .home-tip {
+    margin: 0;
+    font-size: var(--font-size-0);
+    color: var(--text-3);
+    text-wrap: balance;
+  }
   .home-actions {
     display: flex;
     flex-wrap: wrap;

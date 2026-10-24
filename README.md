@@ -32,9 +32,9 @@
 
 1. 点击右上角 Code，选择 Download ZIP，解压
 2. 双击 `index.html`，用 Chrome 或 Edge 打开
-3. 点击「打开文件夹」，选择存放图片的文件夹
+3. 点击「打开文件夹」，选择存放图片的文件夹；也可以直接把文件夹拖进页面，或按 `Ctrl`+`V` 粘贴
 
-无需安装 Node、npm，无需启动服务与联网。按 `H` 查看全部快捷键。
+无需安装 Node、npm，无需启动服务与联网。按 `H` 查看全部快捷键。拖入与粘贴依赖浏览器提供的文件夹访问接口，Firefox 与 Safari 只能用按钮选择文件夹。
 
 > [!NOTE]
 > 双击 `index.html` 打开时浏览器不允许注册 Service Worker，仅「安装为应用」与离线缓存不可用，其余功能相同。需要这两项时见[部署到 GitHub Pages](#部署到-github-pages)。
